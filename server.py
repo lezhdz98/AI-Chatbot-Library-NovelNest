@@ -9,19 +9,9 @@ load_dotenv()  # Load environment variables from .env file
 app = Flask(__name__)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(
-    api_key = OPENAI_API_KEY,
-    #organization= "Personal",
-    #project="proj_oGAdo3IuZdMv3AMDUMK0HfVy"
+    api_key = OPENAI_API_KEY
 )
 
-#Creating assistant
-# bot_assistant = client.beta.assistants.create(
-#         name="Chatbot Assistant for a Library",
-#         instructions='''You are an expert on the service customer side.
-#         Use you knowledge base to answer questions about the business and to fitness topics always like a recomendation''',
-#         model="gpt-4o",
-#         tools=[{"type": "file_search"}],
-#     )
 
 # Store conversation history
 conversation_history = [
