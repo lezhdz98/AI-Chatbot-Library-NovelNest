@@ -9,7 +9,12 @@ This project uses environment variables stored in a `.env` file to configure sen
 Inside the root directory of the project, create a new file named `.env` and add the following content:
 
 ```
-# OpenAI API Key OPENAI_API_KEY=your_openai_api_key_here  # Pinecone API Key and Environment PINECONE_API_KEY=your_pinecone_api_key_here PINECONE_ENV=your_pinecone_environment_here
+# OpenAI API Key
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Pinecone API Key and Environment
+PINECONE_API_KEY=your_pinecone_api_key_here
+PINECONE_ENV=your_pinecone_environment_here
 ```
 
 Replace `your_openai_api_key_here` with your actual OpenAI API key.  
