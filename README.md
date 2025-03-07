@@ -8,7 +8,9 @@ This project uses environment variables stored in a `.env` file to configure sen
 
 Inside the root directory of the project, create a new file named `.env` and add the following content:
 
-`# OpenAI API Key OPENAI_API_KEY=your_openai_api_key_here  # Pinecone API Key and Environment PINECONE_API_KEY=your_pinecone_api_key_here PINECONE_ENV=your_pinecone_environment_here`
+```
+# OpenAI API Key OPENAI_API_KEY=your_openai_api_key_here  # Pinecone API Key and Environment PINECONE_API_KEY=your_pinecone_api_key_here PINECONE_ENV=your_pinecone_environment_here
+```
 
 Replace `your_openai_api_key_here` with your actual OpenAI API key.  
 Replace `your_pinecone_api_key_here` with your Pinecone API key and `your_pinecone_environment_here` with your Pinecone environment.
@@ -40,28 +42,28 @@ To set up your Python environment, follow these steps:
 1. **Create a virtual environment**: Run the following command to create a virtual environment:
 
 ```bash
-    python -m venv venv
+python -m venv venv
 ```
 
 2. **Activate the virtual environment**:
 
-   - On Windows:
-     ```bash
-     .\venv\Scripts\activate
-     ```
-   - On macOS/Linux:
+- On Windows:
 
-   ````bash
-       source venv/bin/activate
-        ```
+```bash
+   .\venv\Scripts\activate
+```
 
-   ````
+- On macOS/Linux:
+
+```bash
+   source venv/bin/activate
+```
 
 3. **Install the required dependencies**: Run the following command to install the project dependencies from `requirements.txt`:
 
-   ```bash
+```bash
    pip install -r requirements.txt
-   ```
+```
 
 ### 4. Running the Project
 
@@ -71,13 +73,17 @@ To run the backend (Flask server):
 
 1. **Navigate to the project directory** (if you are not already there):
 
-   `cd path/to/your/project`
+```bash
+cd path/to/your/project
+```
 
 2. **Run the Flask server**:
 
-   `python server.py`
+```bash
+python server.py
+```
 
-   The server should now be running. You can test it by visiting `http://localhost:5000` in your web browser.
+The server should now be running. You can test it by visiting `http://localhost:5000` in your web browser.
 
 #### Frontend: `frontend.py`
 
@@ -85,10 +91,14 @@ If you have a frontend component to run (for example, using Streamlit or another
 
 1. **Navigate to the project directory** (if not already there):
 
-   `cd path/to/your/project`
+```bash
+cd path/to/your/project
+```
 
 2. **Run the frontend**:
 
-   `python frontend.py`
+```bash
+python frontend.py
+```
 
-   The frontend should now be running. You can test it by visiting the appropriate URL provided by the frontend application (such as `http://localhost:8501` for Streamlit).
+The frontend should now be running. You can test it by visiting the appropriate URL provided by the frontend application (such as `http://localhost:8501` for Streamlit).
