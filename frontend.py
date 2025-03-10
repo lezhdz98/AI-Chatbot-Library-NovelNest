@@ -37,7 +37,6 @@ if st.button("Start Chat"):
         if new_user in st.session_state.existing_sessions:
             st.warning(f"The session name '{new_user}' already exists. Please choose a different name.")
         else:
-            print(new_user)
             response = requests.post("http://127.0.0.1:5000/new_session", json={'session_name': new_user})
             if response.status_code == 200:
                 st.session_state.selected_user = new_user  # Auto-select new session
