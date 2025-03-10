@@ -1,50 +1,92 @@
 from flask import Flask, request, jsonify
-from openai import OpenAI
-import os
 from dotenv import load_dotenv
+import os
+from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables.history import RunnableWithMessageHistory
 
-load_dotenv()  # Load environment variables from .env file
-
+load_dotenv()  # Load API key from .env
 
 app = Flask(__name__)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(
-    api_key = OPENAI_API_KEY
-)
 
+#Store separate memory per user
+session_memory = {}
 
-# Store conversation history
-conversation_history = [
-    {
-        "role":"system",
-        "content":"You are a library chatbot support."
-    }
-]
+#Define a function to get session history per user
+def get_session_history(session_name: str):
+    return session_memory[session_name].chat_memory.messages if session_name in session_memory else []
 
+# Create a prompt template for the chatbot
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful library chatbot. Keep your responses clear and concise."),
+    ("human", "{input}")
+])
 
+#Get all active sessions
+@app.route('/sessions', methods=['GET'])
+def get_sessions():
+    return jsonify({"sessions": list(session_memory.keys())})
+
+#Create a new session
+@app.route('/new_session', methods=['POST'])
+def new_session():
+    session_name = request.json.get('session_name')
+    if not session_name:
+        return jsonify({"error": "Session name is required."}), 400
+
+    if session_name not in session_memory:
+        session_memory[session_name] = ConversationBufferMemory(return_messages=True)
+        return jsonify({"message": f"Session '{session_name}' created successfully."})
+    else:
+        return jsonify({"message": f"Session '{session_name}' already exists."})
+
+#Chat route with session handling
 @app.route('/chat', methods=['POST'])
 def chat():
-    global conversation_history
+    session_name = request.json.get('session_name')
     user_input = request.json.get('message')
 
-    # Add user message to conversation history
-    conversation_history.append({"role": "user", "content": user_input})
+    print(session_name, user_input)
 
-    response = client.chat.completions.create(
-        model = "gpt-4o-mini",
-        messages=conversation_history,
-        max_tokens=150
+    if not session_name or session_name not in session_memory:
+        return jsonify({'error': "Invalid session."}), 400
+
+    #Use OpenAI Model
+    llm = ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY)
+
+    #Get memory for the specific user session
+    memory = session_memory[session_name]
+
+    #Create a conversation chain
+    chain = prompt | llm
+
+    #Create a conversation object with the chain and memory
+    conversation = RunnableWithMessageHistory(
+        chain,
+        memory=memory,
+        #Pass the session history
+        get_session_history=lambda session_id: session_memory[session_id].chat_memory 
+        if session_id in session_memory else [] 
     )
 
-    response_str = response.choices[0].message.content
-    
-    # Add assistant response to conversation history
-    conversation_history.append({"role": "assistant", "content": response_str})
+    #Invoke the conversation with user input
+    response = conversation.invoke(
+        {"input": user_input}, 
+        {"configurable": {"session_id": session_name}} 
+    )
 
-    print(f"Chat History: \n{conversation_history}")
-    
-    return jsonify({'response': response_str})
+    # Extracting the content from AIMessage
+    if isinstance(response, list):
+        # If response is a list of AIMessage objects, extract text content
+        response_content = [message.content for message in response if hasattr(message, 'content')]
+    else:
+        # If it's a single message object, extract content
+        response_content = response.content if hasattr(response, 'content') else str(response)
 
+    # Ensure the response is serializable and return
+    return jsonify({'response': response_content})
 
 if __name__ == '__main__':
     app.run(debug=True)
