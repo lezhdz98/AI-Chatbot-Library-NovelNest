@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from faq_search_rag import query_faq_pinecone
 
 load_dotenv()  # Load API key from .env
 
@@ -59,7 +60,13 @@ def chat():
     #Get memory for the specific user session
     memory = session_memory[session_name]
 
-    #Create a conversation chain
+     # Query Pinecone (RAG part) to fetch relevant FAQ
+    faq_answer = query_faq_pinecone(user_input)  # Call your RAG query function
+
+    # Append the RAG result to the user's input before passing it to the LLM
+    augmented_input = f"Here is a relevant FAQ I found: {faq_answer}\n\nUser's question: {user_input}"
+
+    # Create a conversation chain with the augmented input
     chain = prompt | llm
 
     #Create a conversation object with the chain and memory
@@ -71,10 +78,10 @@ def chat():
         if session_id in session_memory else [] 
     )
 
-    #Invoke the conversation with user input
+    # Invoke the conversation with augmented input
     response = conversation.invoke(
-        {"input": user_input}, 
-        {"configurable": {"session_id": session_name}} 
+        {"input": augmented_input},
+        {"configurable": {"session_id": session_name}}
     )
 
     # Extracting the content from AIMessage
