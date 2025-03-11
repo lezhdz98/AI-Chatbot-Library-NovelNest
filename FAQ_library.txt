@@ -1,5 +1,8 @@
 Frequently Asked Questions (FAQ)
 General Information
+
+0. Name of the Library: NovelNest
+
 1. What are the library’s hours of operation?
 Our library is open:
 
