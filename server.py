@@ -5,7 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from faq_search_rag import query_faq_pinecone
+from faq_search_rag import query_faq_pinecone, load_faq_data, generate_embeddings, upload_faq_to_pinecone
 import json
 import openai
 
@@ -20,6 +20,18 @@ session_memory = {}
 #Define a function to get session history per user
 def get_session_history(session_name: str):
     return session_memory[session_name].chat_memory.messages if session_name in session_memory else []
+
+#RAG part to fetch relevant FAQ
+file_name = 'FAQ_library.txt'
+
+# Step 1: Load FAQ data
+faq_data = load_faq_data(file_name)  
+    
+# Step 2: Generate embeddings for FAQ data
+faq_embeddings = generate_embeddings(faq_data)
+
+# Step 3: Upload FAQ data and embeddings to Pinecone
+upload_faq_to_pinecone(faq_data, faq_embeddings)
 
 # AI-powered sentiment analysis
 def analyze_sentiment(user_input):
@@ -128,8 +140,7 @@ def chat():
     if sentiment == "negative":
         print(f"[Mock] Escalating conversation due to negative sentiment in session {session_name}")
         augmented_input = augmented_input+"I sense you're having trouble. I'll escalate this to a librarian for assistance."
-        #return jsonify({'response': "I sense you're having trouble. I'll escalate this to a librarian for assistance."})
-
+        
     # AI-powered intent detection
     detected_intent = detect_intent(user_input)
     
@@ -158,22 +169,18 @@ def chat():
 
         if missing_details:
             # If any details are missing, ask for the missing ones
-            return jsonify({'response': f"I need more details to confirm your appointment. Can you provide the {' and '.join(missing_details)}?"})
-
-        # If all details are provided, confirm the appointment
-        appointment_info = session_memory[session_name]["appointment"]
-
-        augmented_input = augmented_input + f"Your appointment has been confirmed for {appointment_info['date']} at {appointment_info['time']} for {appointment_info['purpose']}."
-        # return jsonify({
-        #     'response': f"Your appointment has been confirmed for {appointment_info['date']} at {appointment_info['time']} for {appointment_info['purpose']}."
-        # })
+            augmented_input = augmented_input + f"I need more details to confirm your appointment. Can you provide the {' and '.join(missing_details)}?"
+        else:
+            # If all details are provided, confirm the appointment
+            print(f"[Mock] Confirming appointment for {session_name}, details: {current_details}")
+            appointment_info = session_memory[session_name]["appointment"]
+            augmented_input = augmented_input + f"Your appointment has been confirmed for {appointment_info['date']} at {appointment_info['time']} for {appointment_info['purpose']}."
 
     # Escalation handling
     if detected_intent == "escalation":
         print(f"[Mock] Escalating issue for {session_name}")
         augmented_input = augmented_input + "I'll escalate this to a librarian for further assistance."
-        #return jsonify({'response': "I'll escalate this to a librarian for further assistance."})
-
+        
     # Query Pinecone (RAG part) to fetch relevant FAQ
     faq_answer = query_faq_pinecone(user_input)  # Call your RAG query function
 
