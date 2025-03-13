@@ -126,8 +126,8 @@ def query_faq_pinecone(query):
     query_embedding = embeddings.embed_query(query)
 
     #Debugging: Print query embedding information
-    print(f"Query embedding length: {len(query_embedding)}")
-    print(f"First 10 values of embedding: {query_embedding[:10]}")  # Check the first 10 values
+    #print(f"Query embedding length: {len(query_embedding)}")
+    #print(f"First 10 values of embedding: {query_embedding[:10]}")  # Check the first 10 values
 
     #Ensure the embedding is valid before querying Pinecone
     if query_embedding is None:
@@ -144,7 +144,7 @@ def query_faq_pinecone(query):
     index = pc.Index(PINECONE_INDEX_NAME)
 
     #Get index statistics (useful for debugging)
-    print(index.describe_index_stats())
+    #print(index.describe_index_stats())
 
     #Query Pinecone using the correct format (Pinecone 2.x)
     results = index.query(

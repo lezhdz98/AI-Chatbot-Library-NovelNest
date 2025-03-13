@@ -1,5 +1,8 @@
 Frequently Asked Questions (FAQ)
 General Information
+
+0. Name of the Library: NovelNest
+
 1. What are the library’s hours of operation?
 Our library is open:
 
@@ -33,7 +36,7 @@ You can renew or reserve books through:
 - Visiting the front desk
 
 7. What happens if I return a book late?
-Late fees are $0.25 per day per item, with a maximum fine of $5 per book.
+Late fees are 0.25 dollars per day per item, with a maximum fine of 5 dollars per book.
 
 Digital Resources & Technology
 8. Does the library offer free Wi-Fi?
@@ -45,8 +48,8 @@ No, we currently do not have online resources like e-books and audiobooks
 10. Do you have computers and printing services?
 Yes! Computers are free to use for members. Printing costs:
 
-- Black & White: $0.10 per page
-- Color: $0.25 per page
+- Black & White: 0.10 dollars per page
+- Color: 0.25 dollars per page
 
 Programs & Services
 11. Does the library host events or classes?
