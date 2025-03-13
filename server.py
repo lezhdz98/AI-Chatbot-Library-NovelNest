@@ -62,22 +62,63 @@ def detect_intent(user_input):
 def extract_appointment_details(user_input):
     """Extract appointment details like date, time, and purpose."""
     client = openai.OpenAI(api_key=OPENAI_API_KEY)
-    
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",  
-        response_format={"type": "json_object"},  # Forces valid JSON output
-        messages=[
-            {"role": "system", "content": "Extract appointment details (date, time, and purpose) from user input. Return only a JSON object in the format: {\"date\": \"\", \"time\": \"\", \"purpose\": \"\"}."},
-            {"role": "user", "content": user_input}
-        ]
-    )
-
-    # Extract structured response
     try:
-        details = json.loads(response.choices[0].message.content)  # Ensure valid JSON
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  
+            response_format={"type": "json_object"},  # Forces valid JSON output
+            messages=[
+                {"role": "system", "content": "Extract appointment details (date, time, and purpose) from user input. Return only a JSON object in the format: {\"date\": \"\", \"time\": \"\", \"purpose\": \"\"}."},
+                {"role": "user", "content": user_input}
+            ]
+        )
+        # Extract structured response from the chat completion
+        details = json.loads(response.choices[0].message.content)
         return details
+
     except json.JSONDecodeError:
+        print("[Error] Invalid JSON response from OpenAI.")
         return {"error": "Invalid JSON response"}
+
+    except openai.OpenAIError as e:
+        print(f"[Error] OpenAI API error: {str(e)}")
+        return {"error": "OpenAI API error"}
+
+# Enhanced Appointment handling with stricter validation
+def handle_appointment(session_name, user_input):
+    """Handle the appointment booking process with strict checks."""
+
+    print(f"[Mock] Handling appointment for {session_name}")
+
+    # Extract details from the user input
+    details = extract_appointment_details(user_input)
+
+    # Get the current appointment details from session memory
+    current_details = session_memory[session_name]["appointment"]
+
+    # Merge new details with the current details, only updating missing fields
+    current_details.update({key: value for key, value in details.items() if value})
+
+    # Ensure all required keys are in the dictionary (initialize with empty strings if missing)
+    for key in ['date', 'time', 'purpose']:
+        current_details.setdefault(key, '')
+
+    # Update the session memory with the merged details
+    session_memory[session_name]["appointment"] = current_details
+
+    # Check for missing details
+    missing_details = [key for key, value in current_details.items() if not value]
+
+    # If any details are missing, prompt the user to provide those
+    if missing_details:
+        augmented_input = f"I need more details to confirm your appointment. Can you provide the {' and '.join(missing_details)}?"
+    else:
+         # If all details are provided, confirm the appointment
+        print(f"[Mock] Confirming appointment for {session_name}, details: {current_details}")
+        appointment_info = session_memory[session_name]["appointment"]
+        augmented_input = augmented_input + f"Your appointment has been confirmed for {appointment_info['date']} at {appointment_info['time']} for {appointment_info['purpose']}."
+    
+    return augmented_input
+
 
 # Define a chat prompt template, initial prompt for the chatbot
 prompt = ChatPromptTemplate.from_messages([
@@ -129,93 +170,77 @@ def chat():
     session_name = request.json.get('session_name')
     user_input = request.json.get('message')
 
-    print(f"[User: {session_name}] {user_input}")
-    augmented_input = f"Here is the user input: {user_input}\n"
-
     if not session_name or session_name not in session_memory:
         return jsonify({'error': "Invalid session."}), 400
-
-    # AI-powered sentiment detection
-    sentiment = analyze_sentiment(user_input)
-    if sentiment == "negative":
-        print(f"[Mock] Escalating conversation due to negative sentiment in session {session_name}")
-        augmented_input = augmented_input+"I sense you're having trouble. I'll escalate this to a librarian for assistance."
-        
-    # AI-powered intent detection
-    detected_intent = detect_intent(user_input)
     
-    # Appointment handling
-    if detected_intent == "appointment":
-        print(f"[Mock] Handling appointment for {session_name}")
+    print(f"[User: {session_name}] {user_input}")
+    response_content = f"Here is the user input: {user_input}\n"
 
-        # Extract details
-        details = extract_appointment_details(user_input)
-
-        # Get the current appointment details from session memory
-        current_details = session_memory[session_name]["appointment"]
-
-        # Merge new details with the current details, only updating missing fields
-        current_details.update({key: value for key, value in details.items() if value})
-
-        # Ensure all required keys are in the dictionary (initialize with empty strings if missing)
-        for key in ['date', 'time', 'purpose']:
-            current_details.setdefault(key, '')
-
-        # Update the session memory with the merged details
-        session_memory[session_name]["appointment"] = current_details
-
-        # Check for missing details
-        missing_details = [key for key, value in current_details.items() if not value]
-
-        if missing_details:
-            # If any details are missing, ask for the missing ones
-            augmented_input = augmented_input + f"I need more details to confirm your appointment. Can you provide the {' and '.join(missing_details)}?"
+    try:
+        # AI-powered sentiment detection
+        sentiment = analyze_sentiment(user_input)
+        if sentiment == "negative":
+            print(f"[Mock] Escalating conversation due to negative sentiment in session {session_name}")
+            response_content = response_content+"I sense you're having trouble. I'll escalate this to a librarian for assistance."
         else:
-            # If all details are provided, confirm the appointment
-            print(f"[Mock] Confirming appointment for {session_name}, details: {current_details}")
-            appointment_info = session_memory[session_name]["appointment"]
-            augmented_input = augmented_input + f"Your appointment has been confirmed for {appointment_info['date']} at {appointment_info['time']} for {appointment_info['purpose']}."
+            # AI-powered intent detection
+            detected_intent = detect_intent(user_input)
+            
+            # Appointment handling
+            if detected_intent == "appointment":
+                response_content = handle_appointment(session_name, user_input)
+            # Escalation handling
+            elif detected_intent == "escalation":
+                print(f"[Mock] Escalating issue for {session_name}")
+                response_content = response_content + "I'll escalate this to a librarian for further assistance."
+                
+            # Query Pinecone (RAG part) to fetch relevant FAQ
+            else:
+                faq_answer = query_faq_pinecone(user_input)  # Call your RAG query function
 
-    # Escalation handling
-    if detected_intent == "escalation":
-        print(f"[Mock] Escalating issue for {session_name}")
-        augmented_input = augmented_input + "I'll escalate this to a librarian for further assistance."
-        
-    # Query Pinecone (RAG part) to fetch relevant FAQ
-    faq_answer = query_faq_pinecone(user_input)  # Call your RAG query function
+                # Append the RAG result to the user's input before passing it to the LLM
+                response_content = response_content+ f"\nHere is a relevant FAQ I found: {faq_answer}\n"
 
-    # Append the RAG result to the user's input before passing it to the LLM
-    augmented_input = augmented_input+ f"\nHere is a relevant FAQ I found: {faq_answer}\n"
+        print(response_content)
 
-    print(augmented_input)
+        #Use OpenAI Model
+        llm = ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY)
+        #Get memory for the specific user session
+        memory = session_memory[session_name]
+        # Create a conversation chain with the augmented input
+        chain = prompt | llm
 
-    #Use OpenAI Model
-    llm = ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY)
-    #Get memory for the specific user session
-    memory = session_memory[session_name]
-    # Create a conversation chain with the augmented input
-    chain = prompt | llm
+        #Create a conversation object with the chain and memory
+        conversation = RunnableWithMessageHistory(
+            chain,
+            memory=memory,
+            #Pass the session history
+            get_session_history=lambda session_id: session_memory[session_id]["chat_memory"].chat_memory 
+            if session_id in session_memory else []
+        )
 
-    #Create a conversation object with the chain and memory
-    conversation = RunnableWithMessageHistory(
-        chain,
-        memory=memory,
-        #Pass the session history
-        get_session_history=lambda session_id: session_memory[session_id]["chat_memory"].chat_memory 
-        if session_id in session_memory else []
-    )
+        # Invoke the conversation with augmented input
+        response = conversation.invoke(
+            {"input": response_content},
+            {"configurable": {"session_id": session_name}}
+        )
 
-    # Invoke the conversation with augmented input
-    response = conversation.invoke(
-        {"input": augmented_input},
-        {"configurable": {"session_id": session_name}}
-    )
+        # Ensure the response is serializable and return
+        final_response = response.content if hasattr(response, 'content') else str(response)
+
+    except openai.RateLimitError as e:
+        final_response = f"Sorry, the system is currently overloaded. Please try again later."
+        print(f"OpenAI API error: {str(e)}")
+
+    except openai.OpenAIError as e:
+        final_response = f"OpenAI API error: {str(e)}"
+
+    except Exception as e:
+        final_response = f"Unexpected error: {str(e)}"
 
     # Ensure the response is serializable and return
-    response_content = response.content if hasattr(response, 'content') else str(response)
-
-    # Ensure the response is serializable and return
-    return jsonify({'response': response_content})
+    print(f"[Bot: {session_name}] {final_response}")
+    return jsonify({'response': final_response})
 
 if __name__ == '__main__':
     app.run(debug=True)
