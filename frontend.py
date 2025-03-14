@@ -10,11 +10,15 @@ if "existing_sessions" not in st.session_state:
     st.session_state.existing_sessions = []
 st.session_state.new_user = ""
 
-# Fetch existing sessions
+# Fetch existing sessions with error handling
 def fetch_sessions():
-    response = requests.get("http://127.0.0.1:5000/sessions")
-    if response.status_code == 200:
-        st.session_state.existing_sessions = response.json().get("sessions", [])
+    try:
+        response = requests.get("http://127.0.0.1:5000/sessions")
+        response.raise_for_status()  # Raise an exception for HTTP errors (4xx, 5xx)
+        if response.status_code == 200:
+            st.session_state.existing_sessions = response.json().get("sessions", [])
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching sessions: {e}")
 
 fetch_sessions()  # Load sessions at start
 
@@ -37,14 +41,18 @@ if st.button("Start Chat"):
         if new_user in st.session_state.existing_sessions:
             st.warning(f"The session name '{new_user}' already exists. Please choose a different name.")
         else:
-            response = requests.post("http://127.0.0.1:5000/new_session", json={'session_name': new_user})
-            if response.status_code == 200:
-                st.session_state.selected_user = new_user  # Auto-select new session
-                fetch_sessions()  # Refresh the dropdown
-                st.success(response.json()["message"])
-                st.rerun()  # Force a rerun to reflect the new session in the UI
-            else:
-                st.error("Failed to create session.")
+            try:
+                response = requests.post("http://127.0.0.1:5000/new_session", json={'session_name': new_user})
+                response.raise_for_status()  # Raise an exception for HTTP errors
+                if response.status_code == 200:
+                    st.session_state.selected_user = new_user  # Auto-select new session
+                    fetch_sessions()  # Refresh the dropdown
+                    st.success(response.json()["message"])
+                    st.rerun()  # Force a rerun to reflect the new session in the UI
+                else:
+                    st.error("Failed to create session.")
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error creating new session: {e}")
     else:
         st.warning("Please select an existing session or enter a new name.")
 
@@ -52,8 +60,12 @@ if st.button("Start Chat"):
 if st.session_state.selected_user != "(New User)" and selected_user != "(New User)":
     user_input = st.text_input("You: ")
     if st.button("Send"):
-        response = requests.post(
-            "http://127.0.0.1:5000/chat",
-            json={'message': user_input, 'session_name': st.session_state.selected_user}
-        )
-        st.write("Bot: " + response.json().get('response', 'Error'))
+        try:
+            response = requests.post(
+                "http://127.0.0.1:5000/chat",
+                json={'message': user_input, 'session_name': st.session_state.selected_user}
+            )
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            st.write("Bot: " + response.json().get('response', 'Error'))
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error communicating with the chatbot backend: {e}")
