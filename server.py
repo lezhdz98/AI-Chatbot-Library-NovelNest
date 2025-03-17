@@ -1,3 +1,11 @@
+"""
+Flask Backend for Library Chatbot
+
+This server handles user sessions, chatbot interactions, sentiment analysis, intent detection, 
+and retrieval-augmented generation (RAG) using Pinecone.
+"""
+
+
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import os
@@ -146,12 +154,23 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
-#Get all active sessions
+"""
+Retrieve a list of all active sessions.
+
+Endpoint: GET /sessions
+Response: JSON object with all active session names.
+"""
 @app.route('/sessions', methods=['GET'])
 def get_sessions():
     return jsonify({"sessions": list(session_memory.keys())})
 
-# Create a new session
+"""
+Create a new user session.
+
+Endpoint: POST /new_session
+Request Body: { "session_name": "user123" }
+Response: JSON message indicating success or if session already exists.
+"""
 @app.route('/new_session', methods=['POST'])
 def new_session():
     session_name = request.json.get('session_name')
@@ -164,7 +183,13 @@ def new_session():
     else:
         return jsonify({"message": f"Session '{session_name}' already exists."})
 
-#Chat route with session handling
+"""
+Handle user chat interactions with session management.
+
+Endpoint: POST /chat
+Request Body: { "session_name": "user123", "message": "How do I book an appointment?" }
+Response: JSON object with chatbot response.
+"""
 @app.route('/chat', methods=['POST'])
 def chat():
     session_name = request.json.get('session_name')
