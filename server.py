@@ -4,8 +4,6 @@ Flask Backend for Library Chatbot
 This server handles user sessions, chatbot interactions, sentiment analysis, intent detection, 
 and retrieval-augmented generation (RAG) using Pinecone.
 """
-
-
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import os
@@ -16,6 +14,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from faq_search_rag import query_faq_pinecone, load_faq_data, generate_embeddings, upload_faq_to_pinecone
 import json
 import openai
+import re
 
 load_dotenv()  # Load API key from .env
 
@@ -58,7 +57,8 @@ def detect_intent(user_input):
         "Determine the intent of the following message and respond with one of these categories only:\n"
         "- appointment\n"
         "- escalation\n"
-        "- general inquiry\n\n"
+        "- faq_question\n"
+        "- general_inquiry\n\n"
         "User Message: " + user_input + "\n\n"
         "Only return one of the categories without explanation."
     )
@@ -118,12 +118,12 @@ def handle_appointment(session_name, user_input):
 
     # If any details are missing, prompt the user to provide those
     if missing_details:
-        augmented_input = f"I need more details to confirm your appointment. Can you provide the {' and '.join(missing_details)}?"
+        augmented_input = f"[Assistant]: I need more details to confirm your appointment. Can you provide the {' and '.join(missing_details)}?"
     else:
          # If all details are provided, confirm the appointment
         print(f"[Mock] Confirming appointment for {session_name}, details: {current_details}")
         appointment_info = session_memory[session_name]["appointment"]
-        augmented_input = augmented_input + f"Your appointment has been confirmed for {appointment_info['date']} at {appointment_info['time']} for {appointment_info['purpose']}."
+        augmented_input = f"[Assistant]: Your appointment has been confirmed for {appointment_info['date']} at {appointment_info['time']} for {appointment_info['purpose']}."
     
     return augmented_input
 
@@ -199,34 +199,40 @@ def chat():
         return jsonify({'error': "Invalid session."}), 400
     
     print(f"[User: {session_name}] {user_input}")
-    response_content = f"Here is the user input: {user_input}\n"
+    response_content = user_input + "\n"
 
     try:
         # AI-powered sentiment detection
         sentiment = analyze_sentiment(user_input)
         if sentiment == "negative":
             print(f"[Mock] Escalating conversation due to negative sentiment in session {session_name}")
-            response_content = response_content+"I sense you're having trouble. I'll escalate this to a librarian for assistance."
+            response_content = response_content + "[Assistant]: I sense you're having trouble. I'll escalate this to a librarian for assistance."
         else:
             # AI-powered intent detection
             detected_intent = detect_intent(user_input)
-            
+            print(f"Detected intent: {detected_intent}")
             # Appointment handling
             if detected_intent == "appointment":
-                response_content = handle_appointment(session_name, user_input)
+                response_content = response_content + handle_appointment(session_name, user_input)
+
             # Escalation handling
             elif detected_intent == "escalation":
                 print(f"[Mock] Escalating issue for {session_name}")
-                response_content = response_content + "I'll escalate this to a librarian for further assistance."
+                response_content = response_content + "[Assistant]: I'll escalate this to a librarian for further assistance."
                 
             # Query Pinecone (RAG part) to fetch relevant FAQ
-            else:
+            elif detected_intent == "faq_question":
                 faq_answer = query_faq_pinecone(user_input)  # Call your RAG query function
 
                 # Append the RAG result to the user's input before passing it to the LLM
-                response_content = response_content+ f"\nHere is a relevant FAQ I found: {faq_answer}\n"
-
-        print(response_content)
+                response_content = response_content+ f"[Assistant]: Here is a relevant FAQ I found: {faq_answer}"
+            elif detected_intent == "general_inquiry":
+                response_content = user_input
+            else:
+                response_content = response_content + "[Assistant]: I'm not sure how to assist with that. Could you clarify?"
+        
+        
+        print(f"[Full response: {session_name}] {response_content}")
 
         #Use OpenAI Model
         llm = ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY)
@@ -266,6 +272,33 @@ def chat():
     # Ensure the response is serializable and return
     print(f"[Bot: {session_name}] {final_response}")
     return jsonify({'response': final_response})
+
+"""
+Retrieve chat history for a session.
+
+Endpoint: GET /chat_history
+Request Params: session_name (string)
+Response: JSON object with chat history.
+"""
+@app.route('/chat_history', methods=['GET'])
+def chat_history():
+    session_name = request.args.get('session_name')
+    
+    if not session_name or session_name not in session_memory:
+        return jsonify({"error": "Invalid session."}), 400
+
+    # Retrieve chat history
+    history = session_memory[session_name]["chat_memory"].chat_memory.messages
+    chat_history = [
+            {
+                "role": "You" if msg.type == "human" else "Bot", 
+                "content": re.sub(r'\[Assistant\]:.*', '', msg.content, flags=re.DOTALL).strip() if msg.type == "human" else msg.content
+            } for msg in history
+        ]
+
+    print(f"[History: {session_name}] {chat_history}")
+    
+    return jsonify({"chat_history": chat_history})
 
 if __name__ == '__main__':
     app.run(debug=True)
